@@ -1,0 +1,118 @@
+<!-- VISTA PÚBLICA (para la comunidad) -->
+<div id="public-view-container">
+  <!-- ENCABEZADO Y MARCA -->
+  <header class="app-header">
+    <div class="container header-content">
+      <a href="#" class="brand-box" onclick="switchToTab('casas'); return false;">
+        <div class="brand-logo">🏠</div>
+        <div>
+          <h1 class="brand-title">Las Casas de Mi Amistad</h1>
+          <p class="brand-subtitle">Grupos pequeños en hogares • Comunidad & Fe</p>
+        </div>
+      </a>
+      <div class="nav-actions">
+        <button id="btn-login-pin" class="btn btn-outline btn-sm" onclick="openPinModal()">
+          🔑 Ingresar con PIN
+        </button>
+        <button id="btn-logout-pin" class="btn btn-secondary btn-sm" style="display:none;" onclick="logoutUserPin()">
+          🚪 Cerrar Sesión
+        </button>
+      </div>
+    </div>
+  </header>
+  <div class="dintel-bar"></div>
+
+  <main class="container mt-3">
+    <!-- PESTAÑAS PRINCIPALES -->
+    <div class="main-tabs">
+      <button class="tab-btn active" id="tab-btn-casas" onclick="switchToTab('casas')">
+        🏠 Casas de Amistad
+      </button>
+      <button class="tab-btn" id="tab-btn-materiales" onclick="switchToTab('materiales')">
+        📚 Materiales Semanales
+      </button>
+      <button class="tab-btn" id="tab-btn-micasa" onclick="switchToTab('micasa')">
+        🗝️ Mi Casa <span id="micasa-indicator" style="font-size:0.7rem; color:var(--accent-terracota); display:none;">(Activo)</span>
+      </button>
+    </div>
+
+    <!-- SECCIÓN 1: CASAS DE AMISTAD (PÚBLICA) -->
+    <section id="section-casas" class="tab-section">
+      <!-- BUSCADOR Y FILTROS -->
+      <div class="search-section">
+        <input type="text" id="search-casa" class="search-input" placeholder="🔍 Buscar por nombre, zona o anfitrión..." onkeyup="filterCasas()">
+        <select id="filter-dia" class="select-input" onchange="filterCasas()">
+          <option value="">Todos los días</option>
+          <option value="Lunes">Lunes</option>
+          <option value="Martes">Martes</option>
+          <option value="Miércoles">Miércoles</option>
+          <option value="Jueves">Jueves</option>
+          <option value="Viernes">Viernes</option>
+          <option value="Sábado">Sábado</option>
+          <option value="Domingo">Domingo</option>
+        </select>
+      </div>
+
+      <!-- GRID DE TARJETAS -->
+      <div id="casas-grid" class="cards-grid">
+        <div class="text-center" style="grid-column: 1/-1; padding: 40px; color: var(--text-muted);">
+          Cargando casas disponibles...
+        </div>
+      </div>
+    </section>
+
+    <!-- SECCIÓN 2: MATERIALES SEMANALES -->
+    <section id="section-materiales" class="tab-section" style="display:none;">
+      <div class="materials-list" id="materials-container">
+        <div class="text-center" style="padding: 40px; color: var(--text-muted);">
+          Cargando materiales semanales...
+        </div>
+      </div>
+    </section>
+
+    <!-- SECCIÓN 3: MI CASA (REQUERE PIN ANFITRIÓN/FACILITADOR) -->
+    <section id="section-micasa" class="tab-section" style="display:none;">
+      <div id="micasa-auth-notice" class="pin-banner" style="display:none;">
+        <div>
+          <strong id="micasa-user-name">Bienvenido</strong>
+          <p id="micasa-user-role" style="font-size:0.85rem; color:var(--text-muted);"></p>
+        </div>
+        <button class="btn btn-outline btn-sm" onclick="logoutUserPin()">Cambiar PIN</button>
+      </div>
+
+      <div id="micasa-unauthenticated" class="text-center" style="background:var(--bg-card); padding:40px; border-radius:var(--border-radius-md); border:1px solid var(--border-color);">
+        <div style="font-size: 3rem; margin-bottom: 12px;">🔑</div>
+        <h3>Sección para Anfitriones y Facilitadores</h3>
+        <p style="color: var(--text-muted); max-width: 480px; margin: 10px auto 20px auto;">
+          Ingresa con tu PIN personalizado para ver el detalle de tu casa asignada, descargar materiales exclusivos y gestionar la comunidad.
+        </p>
+        <button class="btn btn-primary" onclick="openPinModal()">Ingresar mi PIN</button>
+      </div>
+
+      <div id="micasa-content" style="display:none;">
+        <div id="micasa-card-details"></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- MODAL PARA INGRESAR PIN -->
+<div class="modal-backdrop" id="pin-modal">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3 class="brand-font">🔑 Acceso con PIN</h3>
+      <button class="modal-close" onclick="closePinModal()">&times;</button>
+    </div>
+    <form onsubmit="handlePinSubmit(event)">
+      <div class="form-group">
+        <label class="form-label" for="pin-input">Ingresa tu PIN de 4 dígitos:</label>
+        <input type="password" id="pin-input" class="form-control" placeholder="Ej. 1001" maxlength="10" required autofocus style="font-size: 1.2rem; text-align: center; letter-spacing: 4px;">
+      </div>
+      <div id="pin-error" style="color: #C5221F; font-size: 0.85rem; margin-bottom: 12px; display: none;"></div>
+      <div style="display: flex; gap: 10px; justify-content: flex-end;">
+        <button type="button" class="btn btn-outline" onclick="closePinModal()">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Verificar</button>
+      </div>
+    </form>
+  </div>
+</div>

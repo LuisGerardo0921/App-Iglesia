@@ -1,0 +1,352 @@
+<!-- PANEL DE ADMINISTRACIÓN (protegido por PIN Admin) -->
+<div id="admin-view-container" style="display: none;">
+  
+  <!-- MODAL O PANTALLA DE ACCESO ADMIN -->
+  <div id="admin-login-screen" class="container mt-3" style="max-width: 450px;">
+    <div style="background: var(--bg-card); padding: 30px; border-radius: var(--border-radius-lg); border: 1px solid var(--border-color); box-shadow: var(--shadow-soft);" class="text-center">
+      <div style="font-size: 3rem; margin-bottom: 12px;">🛡️</div>
+      <h2 style="margin-bottom: 8px;">Panel de Administración</h2>
+      <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 20px;">
+        Ingresa la contraseña o PIN de Administrador para gestionar el sistema.
+      </p>
+      <form onsubmit="handleAdminAuth(event)">
+        <div class="form-group">
+          <input type="password" id="admin-pin-input" class="form-control" placeholder="PIN de Administrador" required style="font-size: 1.2rem; text-align: center; letter-spacing: 4px;">
+        </div>
+        <div id="admin-pin-error" style="color: #C5221F; font-size: 0.85rem; margin-bottom: 12px; display: none;"></div>
+        <button type="submit" class="btn btn-primary" style="width: 100%;">Acceder al Panel</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- PANEL PRINCIPAL DE ADMINISTRACIÓN -->
+  <div id="admin-dashboard" class="container mt-3" style="display: none;">
+    
+    <!-- BARRA SUPERIOR ADMIN -->
+    <div class="admin-header-bar">
+      <div>
+        <h2>⚙️ Panel de Administración</h2>
+        <span style="font-size: 0.8rem; opacity: 0.8;">"Las Casas de Mi Amistad"</span>
+      </div>
+      <div style="display: flex; gap: 10px;">
+        <a href="?view=publico" class="btn btn-secondary btn-sm">👁️ Ir a Vista Pública</a>
+        <button class="btn btn-outline btn-sm" style="color:#FFF; border-color:rgba(255,255,255,0.4);" onclick="logoutAdmin()">🚪 Salir</button>
+      </div>
+    </div>
+
+    <!-- MÉTRICAS RÁPIDAS -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-number" id="stat-casas">0</div>
+        <div class="stat-label">Casas Registradas</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number" id="stat-integrantes">0</div>
+        <div class="stat-label">Integrantes Totales</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number" id="stat-materiales">0</div>
+        <div class="stat-label">Materiales PDF</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number" id="stat-usuarios">0</div>
+        <div class="stat-label">PINs de Acceso</div>
+      </div>
+    </div>
+
+    <!-- PESTAÑAS ADMIN -->
+    <div class="main-tabs">
+      <button class="tab-btn active" id="admin-tab-casas" onclick="switchAdminTab('casas')">🏠 Gestión de Casas</button>
+      <button class="tab-btn" id="admin-tab-integrantes" onclick="switchAdminTab('integrantes')">👥 Integrantes & Asignaciones</button>
+      <button class="tab-btn" id="admin-tab-materiales" onclick="switchAdminTab('materiales')">📚 Materiales PDF</button>
+      <button class="tab-btn" id="admin-tab-usuarios" onclick="switchAdminTab('usuarios')">🔑 PINs y Permisos</button>
+    </div>
+
+    <!-- 1. GESTIÓN DE CASAS -->
+    <section id="admin-sec-casas">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h3>Lista de Casas de Amistad</h3>
+        <button class="btn btn-primary btn-sm" onclick="openCasaModal()">+ Agregar Nueva Casa</button>
+      </div>
+      <div class="table-responsive">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Nombre</th>
+              <th>Dirección</th>
+              <th>Anfitrión / Facilitador</th>
+              <th>Día y Horario</th>
+              <th>Estado</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="admin-table-casas-body">
+            <tr><td colspan="7" class="text-center">Cargando datos...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 2. GESTIÓN DE INTEGRANTES -->
+    <section id="admin-sec-integrantes" style="display:none;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h3>Integrantes Registrados</h3>
+        <button class="btn btn-primary btn-sm" onclick="openIntegranteModal()">+ Registrar Integrante</button>
+      </div>
+      <div class="table-responsive">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Nombre</th>
+              <th>Teléfono</th>
+              <th>Casa Asignada</th>
+              <th>Fecha Registro</th>
+              <th>Estado</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="admin-table-integrantes-body">
+            <tr><td colspan="7" class="text-center">Cargando integrantes...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 3. GESTIÓN DE MATERIALES PDF -->
+    <section id="admin-sec-materiales" style="display:none;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h3>Materiales Semanales (PDF)</h3>
+        <button class="btn btn-primary btn-sm" onclick="openMaterialModal()">+ Publicar Nuevo Material</button>
+      </div>
+      <div class="table-responsive">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Título</th>
+              <th>Descripción</th>
+              <th>Fecha</th>
+              <th>Enlace Drive</th>
+              <th>Estado</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="admin-table-materiales-body">
+            <tr><td colspan="7" class="text-center">Cargando materiales...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 4. GESTIÓN DE USUARIOS Y PINS -->
+    <section id="admin-sec-usuarios" style="display:none;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h3>PINs de Acceso</h3>
+        <button class="btn btn-primary btn-sm" onclick="openUsuarioModal()">+ Nuevo Usuario / PIN</button>
+      </div>
+      <div class="table-responsive">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Nombre</th>
+              <th>Tipo de Usuario</th>
+              <th>Casa Asignada</th>
+              <th>PIN</th>
+              <th>Estado</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="admin-table-usuarios-body">
+            <tr><td colspan="6" class="text-center">Cargando PINs de acceso...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<!-- MODAL CASA -->
+<div class="modal-backdrop" id="modal-casa">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3 id="modal-casa-title">Casa de Amistad</h3>
+      <button class="modal-close" onclick="closeModal('modal-casa')">&times;</button>
+    </div>
+    <form onsubmit="saveCasaForm(event)">
+      <input type="hidden" id="casa-form-id">
+      <div class="form-group">
+        <label class="form-label">Nombre de la Casa</label>
+        <input type="text" id="casa-form-nombre" class="form-control" placeholder="Ej. Casa Betania" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Dirección Completa</label>
+        <input type="text" id="casa-form-direccion" class="form-control" placeholder="Ej. Av. Las Palmas 420, Col. Centro" required>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+        <div class="form-group">
+          <label class="form-label">Anfitrión</label>
+          <input type="text" id="casa-form-anfitrion" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Facilitador</label>
+          <input type="text" id="casa-form-facilitador" class="form-control" required>
+        </div>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px;">
+        <div class="form-group">
+          <label class="form-label">Teléfono</label>
+          <input type="text" id="casa-form-telefono" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Día</label>
+          <select id="casa-form-dia" class="form-control" required>
+            <option value="Lunes">Lunes</option>
+            <option value="Martes">Martes</option>
+            <option value="Miércoles">Miércoles</option>
+            <option value="Jueves">Jueves</option>
+            <option value="Viernes">Viernes</option>
+            <option value="Sábado">Sábado</option>
+            <option value="Domingo">Domingo</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Horario</label>
+          <input type="text" id="casa-form-horario" class="form-control" placeholder="19:30" required>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Estado</label>
+        <select id="casa-form-estado" class="form-control">
+          <option value="Activo">Activo</option>
+          <option value="Inactivo">Inactivo</option>
+        </select>
+      </div>
+      <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+        <button type="button" class="btn btn-outline" onclick="closeModal('modal-casa')">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Guardar Casa</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL INTEGRANTE -->
+<div class="modal-backdrop" id="modal-integrante">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3 id="modal-integrante-title">Integrante</h3>
+      <button class="modal-close" onclick="closeModal('modal-integrante')">&times;</button>
+    </div>
+    <form onsubmit="saveIntegranteForm(event)">
+      <input type="hidden" id="int-form-id">
+      <div class="form-group">
+        <label class="form-label">Nombre Completo</label>
+        <input type="text" id="int-form-nombre" class="form-control" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Teléfono de Contacto</label>
+        <input type="text" id="int-form-telefono" class="form-control" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Casa Asignada</label>
+        <select id="int-form-casa" class="form-control" required></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Estado</label>
+        <select id="int-form-estado" class="form-control">
+          <option value="Activo">Activo</option>
+          <option value="Inactivo">Inactivo</option>
+        </select>
+      </div>
+      <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+        <button type="button" class="btn btn-outline" onclick="closeModal('modal-integrante')">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Guardar Integrante</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL MATERIAL -->
+<div class="modal-backdrop" id="modal-material">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3 id="modal-material-title">Material PDF</h3>
+      <button class="modal-close" onclick="closeModal('modal-material')">&times;</button>
+    </div>
+    <form onsubmit="saveMaterialForm(event)">
+      <input type="hidden" id="mat-form-id">
+      <div class="form-group">
+        <label class="form-label">Título del Estudio/Material</label>
+        <input type="text" id="mat-form-titulo" class="form-control" required placeholder="Ej. Estudio 1: La Fe en Familia">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Descripción</label>
+        <textarea id="mat-form-descripcion" class="form-control" rows="3" required></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Fecha de Publicación</label>
+        <input type="date" id="mat-form-fecha" class="form-control" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Enlace de Google Drive (PDF)</label>
+        <input type="url" id="mat-form-enlace" class="form-control" placeholder="https://drive.google.com/file/d/..." required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Estado</label>
+        <select id="mat-form-estado" class="form-control">
+          <option value="Activo">Activo</option>
+          <option value="Inactivo">Inactivo</option>
+        </select>
+      </div>
+      <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+        <button type="button" class="btn btn-outline" onclick="closeModal('modal-material')">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Publicar Material</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL USUARIOS Y PINS -->
+<div class="modal-backdrop" id="modal-usuario">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3 id="modal-usuario-title">Usuario y PIN</h3>
+      <button class="modal-close" onclick="closeModal('modal-usuario')">&times;</button>
+    </div>
+    <form onsubmit="saveUsuarioForm(event)">
+      <input type="hidden" id="usr-form-pin-original">
+      <div class="form-group">
+        <label class="form-label">Nombre del Responsable</label>
+        <input type="text" id="usr-form-nombre" class="form-control" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Tipo de Usuario</label>
+        <select id="usr-form-tipo" class="form-control" required onchange="toggleCasaAssignmentOption()">
+          <option value="anfitrion">Anfitrión / Facilitador</option>
+          <option value="admin">Administrador General</option>
+        </select>
+      </div>
+      <div class="form-group" id="usr-form-casa-group">
+        <label class="form-label">Casa Asignada</label>
+        <select id="usr-form-casa" class="form-control"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">PIN de Acceso (4-6 dígitos)</label>
+        <input type="text" id="usr-form-pin" class="form-control" required style="letter-spacing: 2px; font-weight: bold;">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Estado</label>
+        <select id="usr-form-estado" class="form-control">
+          <option value="Activo">Activo</option>
+          <option value="Inactivo">Inactivo</option>
+        </select>
+      </div>
+      <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+        <button type="button" class="btn btn-outline" onclick="closeModal('modal-usuario')">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Guardar PIN</button>
+      </div>
+    </form>
+  </div>
+</div>

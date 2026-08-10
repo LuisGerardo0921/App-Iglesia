@@ -1,0 +1,836 @@
+// ESTADO GLOBAL DE LA APLICACIÓN
+var state = {
+  view: 'publico',
+  publicData: { casas: [], materiales: [] },
+  adminData: { casas: [], integrantes: [], materiales: [], usuarios: [] },
+  userPin: localStorage.getItem('casas_user_pin') || null,
+  adminPin: sessionStorage.getItem('casas_admin_pin') || null
+};
+
+// SIMULADOR BASE DE DATOS LOCAL
+var mockDb = {
+  casas: [
+    { ID: 'C101', Nombre: 'Casa Betania', Direccion: 'Av. Las Palmas 420, Col. Centro', Anfitrion: 'Carlos Mendoza', Facilitador: 'David Silva', Telefono: '5551234567', Dia: 'Miércoles', Horario: '19:30', Estado: 'Activo' },
+    { ID: 'C102', Nombre: 'Casa Shalom', Direccion: 'Calle Los Olivos 88, Col. Jardines', Anfitrion: 'Elena Gómez', Facilitador: 'María López', Telefono: '5559876543', Dia: 'Jueves', Horario: '20:00', Estado: 'Activo' },
+    { ID: 'C103', Nombre: 'Casa Nueva Esperanza', Direccion: 'Calle del Sol 15, Col. Vista Hermosa', Anfitrion: 'Roberto Ruiz', Facilitador: 'Jorge Ramos', Telefono: '5554567890', Dia: 'Viernes', Horario: '19:00', Estado: 'Activo' }
+  ],
+  integrantes: [
+    { ID: 'I1001', Nombre: 'Ana Martínez', Telefono: '5551112233', CasaAsignada: 'C101', FechaRegistro: '2026-01-10', Estado: 'Activo' },
+    { ID: 'I1002', Nombre: 'Luis Hernández', Telefono: '5552223344', CasaAsignada: 'C101', FechaRegistro: '2026-01-12', Estado: 'Activo' },
+    { ID: 'I1003', Nombre: 'Sofía Torres', Telefono: '5553334455', CasaAsignada: 'C102', FechaRegistro: '2026-01-15', Estado: 'Activo' },
+    { ID: 'I1004', Nombre: 'Pedro Ramírez', Telefono: '5554445566', CasaAsignada: 'C102', FechaRegistro: '2026-01-20', Estado: 'Activo' },
+    { ID: 'I1005', Nombre: 'Lucía Morales', Telefono: '5555556677', CasaAsignada: 'C103', FechaRegistro: '2026-02-01', Estado: 'Activo' },
+    { ID: 'I1006', Nombre: 'Gabriel Castro', Telefono: '5556667788', CasaAsignada: 'C103', FechaRegistro: '2026-02-05', Estado: 'Activo' }
+  ],
+  materiales: [
+    { ID: 'M201', Titulo: 'Estudio 1: La Fe en Familia', Descripcion: 'Guía de preguntas y pasajes bíblicos para la semana.', Fecha: '2026-02-08', EnlaceDrive: 'https://drive.google.com', Estado: 'Activo' },
+    { ID: 'M202', Titulo: 'Estudio 2: Caminar en Comunidad', Descripcion: 'Material sobre el servicio mutuo y hospitalidad.', Fecha: '2026-02-15', EnlaceDrive: 'https://drive.google.com', Estado: 'Activo' }
+  ],
+  usuarios: [
+    { Nombre: 'Pastor / Admin', Tipo: 'admin', CasaAsignada: '', PIN: '1234', Estado: 'Activo' },
+    { Nombre: 'Carlos Mendoza', Tipo: 'anfitrion', CasaAsignada: 'C101', PIN: '1001', Estado: 'Activo' },
+    { Nombre: 'Elena Gómez', Tipo: 'anfitrion', CasaAsignada: 'C102', PIN: '1002', Estado: 'Activo' },
+    { Nombre: 'Roberto Ruiz', Tipo: 'anfitrion', CasaAsignada: 'C103', PIN: '1003', Estado: 'Activo' }
+  ]
+};
+
+document.addEventListener("DOMContentLoaded", function() {
+  initView();
+});
+
+function initView() {
+  var params = new URLSearchParams(window.location.search);
+  if (params.get('view') === 'admin') {
+    showAdminView();
+  } else {
+    showPublicView();
+  }
+}
+
+function showPublicView() {
+  state.view = 'publico';
+  document.getElementById('public-view-container').style.display = 'block';
+  document.getElementById('admin-view-container').style.display = 'none';
+  loadPublicData();
+  if (state.userPin) {
+    checkUserPin(state.userPin, false);
+  }
+}
+
+function showAdminView() {
+  state.view = 'admin';
+  document.getElementById('public-view-container').style.display = 'none';
+  document.getElementById('admin-view-container').style.display = 'block';
+
+  if (state.adminPin) {
+    document.getElementById('admin-login-screen').style.display = 'none';
+    document.getElementById('admin-dashboard').style.display = 'block';
+    loadAdminData();
+  } else {
+    document.getElementById('admin-login-screen').style.display = 'block';
+    document.getElementById('admin-dashboard').style.display = 'none';
+  }
+}
+
+// CONEXIÓN BACKEND Y FALLBACK A MOCK EN LOCALHOST
+function callBackend(fnName, args) {
+  return new Promise(function(resolve, reject) {
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      var runner = google.script.run
+        .withSuccessHandler(function(res) { resolve(res); })
+        .withFailureHandler(function(err) { reject(err); });
+      
+      if (args && args.length > 0) {
+        runner[fnName].apply(runner, args);
+      } else {
+        runner[fnName]();
+      }
+    } else {
+      setTimeout(function() {
+        var res = mockBackendCall(fnName, args || []);
+        resolve(res);
+      }, 100);
+    }
+  });
+}
+
+function mockBackendCall(fnName, args) {
+  if (fnName === 'verifyPin') {
+    var pin = String(args[0]).trim();
+    var found = mockDb.usuarios.find(u => String(u.PIN).trim() === pin && u.Estado.toLowerCase() === 'activo');
+    if (found) {
+      return { success: true, user: { nombre: found.Nombre, tipo: found.Tipo, casaAsignada: found.CasaAsignada, pin: found.PIN } };
+    }
+    return { success: false, message: 'PIN incorrecto o inactivo.' };
+  }
+  if (fnName === 'getPublicData') {
+    var conteo = {};
+    mockDb.integrantes.forEach(i => {
+      if (i.Estado.toLowerCase() === 'activo') conteo[i.CasaAsignada] = (conteo[i.CasaAsignada] || 0) + 1;
+    });
+    var casasPub = mockDb.casas.filter(c => c.Estado.toLowerCase() === 'activo').map(c => ({
+      id: c.ID, nombre: c.Nombre, direccion: c.Direccion, anfitrion: c.Anfitrion,
+      facilitador: c.Facilitador, telefono: c.Telefono, dia: c.Dia, horario: c.Horario,
+      totalIntegrantes: conteo[c.ID] || 0
+    }));
+    var matPub = mockDb.materiales.filter(m => m.Estado.toLowerCase() === 'activo').map(m => ({
+      id: m.ID, titulo: m.Titulo, descripcion: m.Descripcion, fecha: m.Fecha, enlaceDrive: m.EnlaceDrive
+    }));
+    return { casas: casasPub, materiales: matPub };
+  }
+  if (fnName === 'getHouseDetailForUser') {
+    var pin = args[0];
+    var auth = mockBackendCall('verifyPin', [pin]);
+    if (!auth.success) return { user: null, casa: null, integrantes: [] };
+    var user = auth.user;
+    var casa = mockDb.casas.find(c => c.ID === user.casaAsignada);
+    var ints = mockDb.integrantes.filter(i => i.CasaAsignada === user.casaAsignada);
+    return { user: user, casa: casa, integrantes: ints };
+  }
+  if (fnName === 'adminGetAllData') {
+    return JSON.parse(JSON.stringify(mockDb));
+  }
+  if (fnName === 'adminSaveCasa') {
+    var data = args[1];
+    if (data.id) {
+      var idx = mockDb.casas.findIndex(c => c.ID === data.id);
+      if (idx !== -1) mockDb.casas[idx] = { ID: data.id, Nombre: data.nombre, Direccion: data.direccion, Anfitrion: data.anfitrion, Facilitador: data.facilitador, Telefono: data.telefono, Dia: data.dia, Horario: data.horario, Estado: data.estado };
+    } else {
+      var newId = 'C' + String(new Date().getTime()).slice(-4);
+      mockDb.casas.push({ ID: newId, Nombre: data.nombre, Direccion: data.direccion, Anfitrion: data.anfitrion, Facilitador: data.facilitador, Telefono: data.telefono, Dia: data.dia, Horario: data.horario, Estado: data.estado || 'Activo' });
+    }
+    return { success: true };
+  }
+  if (fnName === 'adminDeleteCasa') {
+    mockDb.casas = mockDb.casas.filter(c => c.ID !== args[1]);
+    return { success: true };
+  }
+  if (fnName === 'adminSaveIntegrante') {
+    var data = args[1];
+    if (data.id) {
+      var idx = mockDb.integrantes.findIndex(i => i.ID === data.id);
+      if (idx !== -1) mockDb.integrantes[idx] = { ID: data.id, Nombre: data.nombre, Telefono: data.telefono, CasaAsignada: data.casaAsignada, FechaRegistro: mockDb.integrantes[idx].FechaRegistro, Estado: data.estado };
+    } else {
+      mockDb.integrantes.push({ ID: 'I' + String(new Date().getTime()).slice(-4), Nombre: data.nombre, Telefono: data.telefono, CasaAsignada: data.casaAsignada, FechaRegistro: new Date().toISOString().split('T')[0], Estado: data.estado || 'Activo' });
+    }
+    return { success: true };
+  }
+  if (fnName === 'adminDeleteIntegrante') {
+    mockDb.integrantes = mockDb.integrantes.filter(i => i.ID !== args[1]);
+    return { success: true };
+  }
+  if (fnName === 'adminSaveMaterial') {
+    var data = args[1];
+    if (data.id) {
+      var idx = mockDb.materiales.findIndex(m => m.ID === data.id);
+      if (idx !== -1) mockDb.materiales[idx] = { ID: data.id, Titulo: data.titulo, Descripcion: data.descripcion, Fecha: data.fecha, EnlaceDrive: data.enlaceDrive, Estado: data.estado };
+    } else {
+      mockDb.materiales.push({ ID: 'M' + String(new Date().getTime()).slice(-4), Titulo: data.titulo, Descripcion: data.descripcion, Fecha: data.fecha, EnlaceDrive: data.enlaceDrive, Estado: data.estado || 'Activo' });
+    }
+    return { success: true };
+  }
+  if (fnName === 'adminDeleteMaterial') {
+    mockDb.materiales = mockDb.materiales.filter(m => m.ID !== args[1]);
+    return { success: true };
+  }
+  if (fnName === 'adminSaveUsuario') {
+    var data = args[1];
+    var idx = mockDb.usuarios.findIndex(u => u.PIN === (data.pinOriginal || data.pin));
+    if (idx !== -1) {
+      mockDb.usuarios[idx] = { Nombre: data.nombre, Tipo: data.tipo, CasaAsignada: data.casaAsignada, PIN: data.pin, Estado: data.estado };
+    } else {
+      mockDb.usuarios.push({ Nombre: data.nombre, Tipo: data.tipo, CasaAsignada: data.casaAsignada, PIN: data.pin, Estado: data.estado || 'Activo' });
+    }
+    return { success: true };
+  }
+  if (fnName === 'adminDeleteUsuario') {
+    mockDb.usuarios = mockDb.usuarios.filter(u => u.PIN !== args[1]);
+    return { success: true };
+  }
+  return { success: true };
+}
+
+function loadPublicData() {
+  callBackend('getPublicData').then(function(data) {
+    if (data) {
+      state.publicData = data;
+      renderCasas(data.casas);
+      renderMateriales(data.materiales);
+    }
+  });
+}
+
+function renderCasas(casas) {
+  var grid = document.getElementById('casas-grid');
+  if (!casas || casas.length === 0) {
+    grid.innerHTML = '<div class="text-center" style="grid-column:1/-1; padding:40px;">No se encontraron Casas disponibles.</div>';
+    return;
+  }
+
+  var html = '';
+  casas.forEach(function(c) {
+    var mapsQuery = encodeURIComponent(c.direccion);
+    var mapsUrl = 'https://www.google.com/maps/search/?api=1&query=' + mapsQuery;
+    var cleanPhone = String(c.telefono).replace(/\D/g, '');
+    var waUrl = 'https://wa.me/52' + cleanPhone;
+
+    html += `
+      <div class="house-card">
+        <div class="house-card-header">
+          <span class="house-badge">📍 ${c.dia} • ${c.horario} hrs</span>
+          <h3 class="house-title brand-font">${escapeHtml(c.nombre)}</h3>
+          <div class="house-address">
+            <span>🏠</span> <span>${escapeHtml(c.direccion)}</span>
+          </div>
+        </div>
+        <div class="house-body">
+          <div class="house-info-row">
+            <span class="info-label">Anfitrión:</span>
+            <span class="info-value">${escapeHtml(c.anfitrion)}</span>
+          </div>
+          <div class="house-info-row">
+            <span class="info-label">Facilitador:</span>
+            <span class="info-value">${escapeHtml(c.facilitador)}</span>
+          </div>
+          <div class="house-info-row">
+            <span class="info-label">Integrantes:</span>
+            <span class="info-value">${c.totalIntegrantes} miembros</span>
+          </div>
+        </div>
+        <div class="house-actions">
+          <a href="${mapsUrl}" target="_blank" class="btn btn-secondary btn-sm" style="flex:1;">📍 Ubicación</a>
+          <a href="tel:${c.telefono}" class="btn btn-outline btn-sm">📞 Llamar</a>
+          <a href="${waUrl}" target="_blank" class="btn btn-primary btn-sm">💬 WhatsApp</a>
+        </div>
+      </div>
+    `;
+  });
+  grid.innerHTML = html;
+}
+
+function filterCasas() {
+  var search = document.getElementById('search-casa').value.toLowerCase();
+  var dia = document.getElementById('filter-dia').value;
+
+  var filtered = state.publicData.casas.filter(function(c) {
+    var matchSearch = c.nombre.toLowerCase().includes(search) || 
+                        c.direccion.toLowerCase().includes(search) || 
+                        c.anfitrion.toLowerCase().includes(search);
+    var matchDia = !dia || c.dia === dia;
+    return matchSearch && matchDia;
+  });
+
+  renderCasas(filtered);
+}
+
+function renderMateriales(materiales) {
+  var container = document.getElementById('materials-container');
+  if (!materiales || materiales.length === 0) {
+    container.innerHTML = '<div class="text-center" style="padding:40px;">No hay materiales publicados esta semana.</div>';
+    return;
+  }
+
+  var html = '';
+  materiales.forEach(function(m) {
+    html += `
+      <div class="material-card">
+        <div class="material-info">
+          <span class="material-date">📅 Publicado: ${escapeHtml(m.fecha)}</span>
+          <h3 class="brand-font">${escapeHtml(m.titulo)}</h3>
+          <p>${escapeHtml(m.descripcion)}</p>
+        </div>
+        <div>
+          <a href="${m.enlaceDrive}" target="_blank" class="btn btn-primary">
+            📄 Descargar PDF
+          </a>
+        </div>
+      </div>
+    `;
+  });
+  container.innerHTML = html;
+}
+
+function switchToTab(tabName) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-section').forEach(s => s.style.display = 'none');
+
+  document.getElementById('tab-btn-' + tabName).classList.add('active');
+  document.getElementById('section-' + tabName).style.display = 'block';
+}
+
+function openPinModal() {
+  document.getElementById('pin-error').style.display = 'none';
+  document.getElementById('pin-modal').classList.add('active');
+  document.getElementById('pin-input').value = '';
+}
+
+function closePinModal() {
+  document.getElementById('pin-modal').classList.remove('active');
+}
+
+function handlePinSubmit(e) {
+  e.preventDefault();
+  var pin = document.getElementById('pin-input').value.trim();
+  checkUserPin(pin, true);
+}
+
+function checkUserPin(pin, showFeedback) {
+  callBackend('verifyPin', [pin]).then(function(res) {
+    if (res && res.success) {
+      if (String(res.user.tipo).toLowerCase() === 'admin') {
+        state.adminPin = pin;
+        sessionStorage.setItem('casas_admin_pin', pin);
+        closePinModal();
+        showAdminView();
+        return;
+      }
+
+      state.userPin = pin;
+      localStorage.setItem('casas_user_pin', pin);
+      closePinModal();
+      updateUserPinUI(res.user);
+      loadMiCasaDetail(pin);
+      switchToTab('micasa');
+    } else {
+      if (showFeedback) {
+        var errDiv = document.getElementById('pin-error');
+        errDiv.textContent = res.message || 'PIN inválido.';
+        errDiv.style.display = 'block';
+      } else {
+        logoutUserPin();
+      }
+    }
+  });
+}
+
+function updateUserPinUI(user) {
+  document.getElementById('btn-login-pin').style.display = 'none';
+  document.getElementById('btn-logout-pin').style.display = 'inline-flex';
+  document.getElementById('micasa-indicator').style.display = 'inline';
+  document.getElementById('micasa-unauthenticated').style.display = 'none';
+  document.getElementById('micasa-auth-notice').style.display = 'flex';
+  document.getElementById('micasa-user-name').textContent = "Hola, " + user.nombre;
+  document.getElementById('micasa-user-role').textContent = "Rol: " + user.tipo.toUpperCase();
+}
+
+function logoutUserPin() {
+  state.userPin = null;
+  localStorage.removeItem('casas_user_pin');
+  document.getElementById('btn-login-pin').style.display = 'inline-flex';
+  document.getElementById('btn-logout-pin').style.display = 'none';
+  document.getElementById('micasa-indicator').style.display = 'none';
+  document.getElementById('micasa-unauthenticated').style.display = 'block';
+  document.getElementById('micasa-auth-notice').style.display = 'none';
+  document.getElementById('micasa-content').style.display = 'none';
+}
+
+function loadMiCasaDetail(pin) {
+  callBackend('getHouseDetailForUser', [pin]).then(function(data) {
+    if (!data || !data.casa) {
+      var noticeHtml = '';
+      if (data && data.user && String(data.user.tipo).toLowerCase() === 'admin') {
+        noticeHtml = `
+          <div class="text-center" style="background:#FFF; padding:30px; border-radius:12px; border:1px solid var(--border-color);">
+            <h3>🛡️ Hola, Administrador General</h3>
+            <p style="color:var(--text-muted); margin: 10px 0 20px 0;">Como administrador puedes gestionar todas las casas desde el panel de control.</p>
+            <button class="btn btn-primary" onclick="showAdminView()">⚙️ Ir al Panel de Administración</button>
+          </div>
+        `;
+      } else {
+        noticeHtml = `
+          <div class="text-center" style="background:#FFF; padding:30px; border-radius:12px; border:1px solid var(--border-color);">
+            <h3>No tienes una casa asignada.</h3>
+            <p style="color:var(--text-muted)">Contacta al administrador para vincular tu PIN a tu Casa de Amistad.</p>
+          </div>
+        `;
+      }
+      document.getElementById('micasa-card-details').innerHTML = noticeHtml;
+      document.getElementById('micasa-content').style.display = 'block';
+      return;
+    }
+
+    var c = data.casa;
+    var miembrosHtml = '';
+    if (data.integrantes && data.integrantes.length > 0) {
+      miembrosHtml = data.integrantes.map(m => `
+        <div class="house-info-row">
+          <div>
+            <strong>${escapeHtml(m.nombre)}</strong>
+            <div style="font-size:0.8rem; color:var(--text-muted);">Registrado: ${m.fechaRegistro}</div>
+          </div>
+          <a href="tel:${m.telefono}" class="btn btn-outline btn-sm">📞 ${m.telefono}</a>
+        </div>
+      `).join('');
+    } else {
+      miembrosHtml = '<p style="color:var(--text-muted);">No hay integrantes registrados en tu casa aún.</p>';
+    }
+
+    document.getElementById('micasa-card-details').innerHTML = `
+      <div style="background:#FFF; border-radius:16px; border:1px solid var(--border-color); padding:24px; box-shadow:var(--shadow-card);">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px;">
+          <div>
+            <span class="house-badge">📍 ${c.Dia} • ${c.Horario} hrs</span>
+            <h2 class="brand-font" style="font-size:1.5rem; margin-top:4px;">${escapeHtml(c.Nombre)}</h2>
+            <p style="color:var(--text-muted);">🏠 ${escapeHtml(c.Direccion)}</p>
+          </div>
+        </div>
+        
+        <h4 class="brand-font" style="margin:20px 0 10px 0; border-bottom:2px solid var(--bg-subtle); padding-bottom:6px;">
+          👥 Integrantes de tu Casa (${data.integrantes.length})
+        </h4>
+        <div>${miembrosHtml}</div>
+      </div>
+    `;
+    document.getElementById('micasa-content').style.display = 'block';
+  });
+}
+
+function handleAdminAuth(e) {
+  e.preventDefault();
+  var pin = document.getElementById('admin-pin-input').value.trim();
+  callBackend('verifyPin', [pin]).then(function(res) {
+    if (res && res.success && String(res.user.tipo).toLowerCase() === 'admin') {
+      state.adminPin = pin;
+      sessionStorage.setItem('casas_admin_pin', pin);
+      document.getElementById('admin-login-screen').style.display = 'none';
+      document.getElementById('admin-dashboard').style.display = 'block';
+      loadAdminData();
+    } else {
+      var err = document.getElementById('admin-pin-error');
+      err.textContent = "PIN inválido o no tiene permisos de Administrador.";
+      err.style.display = 'block';
+    }
+  });
+}
+
+function logoutAdmin() {
+  state.adminPin = null;
+  sessionStorage.removeItem('casas_admin_pin');
+  document.getElementById('admin-dashboard').style.display = 'none';
+  document.getElementById('admin-login-screen').style.display = 'block';
+}
+
+function loadAdminData() {
+  callBackend('adminGetAllData', [state.adminPin]).then(function(data) {
+    if (data) {
+      state.adminData = data;
+      updateAdminStats();
+      renderAdminCasas();
+      renderAdminIntegrantes();
+      renderAdminMateriales();
+      renderAdminUsuarios();
+    }
+  }).catch(function(err) {
+    alert("Error al cargar datos de administración: " + err);
+    logoutAdmin();
+  });
+}
+
+function updateAdminStats() {
+  document.getElementById('stat-casas').textContent = state.adminData.casas.length;
+  document.getElementById('stat-integrantes').textContent = state.adminData.integrantes.length;
+  document.getElementById('stat-materiales').textContent = state.adminData.materiales.length;
+  document.getElementById('stat-usuarios').textContent = state.adminData.usuarios.length;
+}
+
+function switchAdminTab(tab) {
+  ['casas', 'integrantes', 'materiales', 'usuarios'].forEach(t => {
+    document.getElementById('admin-tab-' + t).classList.remove('active');
+    document.getElementById('admin-sec-' + t).style.display = 'none';
+  });
+  document.getElementById('admin-tab-' + tab).classList.add('active');
+  document.getElementById('admin-sec-' + tab).style.display = 'block';
+}
+
+function renderAdminCasas() {
+  var tbody = document.getElementById('admin-table-casas-body');
+  if (state.adminData.casas.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center">No hay casas registradas. Haz clic en "+ Agregar Nueva Casa".</td></tr>';
+    return;
+  }
+
+  var html = '';
+  state.adminData.casas.forEach(c => {
+    var statusBadge = c.Estado === 'Activo' ? '<span class="badge-active">Activo</span>' : '<span class="badge-inactive">Inactivo</span>';
+    html += `
+      <tr>
+        <td><strong>${c.ID}</strong></td>
+        <td>${escapeHtml(c.Nombre)}</td>
+        <td>${escapeHtml(c.Direccion)}</td>
+        <td>${escapeHtml(c.Anfitrion)} / ${escapeHtml(c.Facilitador)}</td>
+        <td>${c.Dia} ${c.Horario} hrs</td>
+        <td>${statusBadge}</td>
+        <td>
+          <button class="btn btn-outline btn-sm" onclick="editCasa('${c.ID}')">✏️ Editar</button>
+          <button class="btn btn-secondary btn-sm" onclick="deleteCasa('${c.ID}')">🗑️</button>
+        </td>
+      </tr>
+    `;
+  });
+  tbody.innerHTML = html;
+}
+
+function renderAdminIntegrantes() {
+  var tbody = document.getElementById('admin-table-integrantes-body');
+  if (state.adminData.integrantes.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center">No hay integrantes registrados. Haz clic en "+ Registrar Integrante".</td></tr>';
+    return;
+  }
+
+  var casaMap = {};
+  state.adminData.casas.forEach(c => casaMap[c.ID] = c.Nombre);
+
+  var html = '';
+  state.adminData.integrantes.forEach(i => {
+    var casaNombre = casaMap[i.CasaAsignada] || 'Sin asignar (' + i.CasaAsignada + ')';
+    html += `
+      <tr>
+        <td><strong>${i.ID}</strong></td>
+        <td>${escapeHtml(i.Nombre)}</td>
+        <td>${i.Telefono}</td>
+        <td>${escapeHtml(casaNombre)}</td>
+        <td>${i.FechaRegistro}</td>
+        <td><span class="badge-active">${i.Estado}</span></td>
+        <td>
+          <button class="btn btn-outline btn-sm" onclick="editIntegrante('${i.ID}')">✏️ Editar</button>
+          <button class="btn btn-secondary btn-sm" onclick="deleteIntegrante('${i.ID}')">🗑️</button>
+        </td>
+      </tr>
+    `;
+  });
+  tbody.innerHTML = html;
+}
+
+function renderAdminMateriales() {
+  var tbody = document.getElementById('admin-table-materiales-body');
+  if (state.adminData.materiales.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center">No hay materiales publicados. Haz clic en "+ Publicar Nuevo Material".</td></tr>';
+    return;
+  }
+
+  var html = '';
+  state.adminData.materiales.forEach(m => {
+    html += `
+      <tr>
+        <td><strong>${m.ID}</strong></td>
+        <td>${escapeHtml(m.Titulo)}</td>
+        <td>${escapeHtml(m.Descripcion)}</td>
+        <td>${m.Fecha}</td>
+        <td><a href="${m.EnlaceDrive}" target="_blank">🔗 Ver Drive</a></td>
+        <td><span class="badge-active">${m.Estado}</span></td>
+        <td>
+          <button class="btn btn-outline btn-sm" onclick="editMaterial('${m.ID}')">✏️ Editar</button>
+          <button class="btn btn-secondary btn-sm" onclick="deleteMaterial('${m.ID}')">🗑️</button>
+        </td>
+      </tr>
+    `;
+  });
+  tbody.innerHTML = html;
+}
+
+function renderAdminUsuarios() {
+  var tbody = document.getElementById('admin-table-usuarios-body');
+  if (state.adminData.usuarios.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center">No hay usuarios registrados. Haz clic en "+ Nuevo Usuario / PIN".</td></tr>';
+    return;
+  }
+
+  var casaMap = {};
+  state.adminData.casas.forEach(c => casaMap[c.ID] = c.Nombre);
+
+  var html = '';
+  state.adminData.usuarios.forEach(u => {
+    var casaLabel = u.CasaAsignada ? (casaMap[u.CasaAsignada] || u.CasaAsignada) : 'N/A (Admin)';
+    html += `
+      <tr>
+        <td><strong>${escapeHtml(u.Nombre)}</strong></td>
+        <td><span class="house-badge">${u.Tipo.toUpperCase()}</span></td>
+        <td>${escapeHtml(casaLabel)}</td>
+        <td><code>${u.PIN}</code></td>
+        <td><span class="badge-active">${u.Estado}</span></td>
+        <td>
+          <button class="btn btn-outline btn-sm" onclick="editUsuario('${u.PIN}')">✏️ Editar</button>
+          <button class="btn btn-secondary btn-sm" onclick="deleteUsuario('${u.PIN}')">🗑️</button>
+        </td>
+      </tr>
+    `;
+  });
+  tbody.innerHTML = html;
+}
+
+function openModal(id) { document.getElementById(id).classList.add('active'); }
+function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+function openCasaModal(casaId) {
+  document.getElementById('casa-form-id').value = casaId || '';
+  document.getElementById('modal-casa-title').textContent = casaId ? 'Editar Casa de Amistad' : 'Nueva Casa de Amistad';
+
+  if (casaId) {
+    var c = state.adminData.casas.find(x => x.ID === casaId);
+    if (c) {
+      document.getElementById('casa-form-nombre').value = c.Nombre;
+      document.getElementById('casa-form-direccion').value = c.Direccion;
+      document.getElementById('casa-form-anfitrion').value = c.Anfitrion;
+      document.getElementById('casa-form-facilitador').value = c.Facilitador;
+      document.getElementById('casa-form-telefono').value = c.Telefono;
+      document.getElementById('casa-form-dia').value = c.Dia;
+      document.getElementById('casa-form-horario').value = c.Horario;
+      document.getElementById('casa-form-estado').value = c.Estado || 'Activo';
+    }
+  } else {
+    document.getElementById('casa-form-nombre').value = '';
+    document.getElementById('casa-form-direccion').value = '';
+    document.getElementById('casa-form-anfitrion').value = '';
+    document.getElementById('casa-form-facilitador').value = '';
+    document.getElementById('casa-form-telefono').value = '';
+    document.getElementById('casa-form-dia').value = 'Miércoles';
+    document.getElementById('casa-form-horario').value = '19:30';
+    document.getElementById('casa-form-estado').value = 'Activo';
+  }
+  openModal('modal-casa');
+}
+
+function saveCasaForm(e) {
+  e.preventDefault();
+  var data = {
+    id: document.getElementById('casa-form-id').value,
+    nombre: document.getElementById('casa-form-nombre').value,
+    direccion: document.getElementById('casa-form-direccion').value,
+    anfitrion: document.getElementById('casa-form-anfitrion').value,
+    facilitador: document.getElementById('casa-form-facilitador').value,
+    telefono: document.getElementById('casa-form-telefono').value,
+    dia: document.getElementById('casa-form-dia').value,
+    horario: document.getElementById('casa-form-horario').value,
+    estado: document.getElementById('casa-form-estado').value
+  };
+
+  callBackend('adminSaveCasa', [state.adminPin, data]).then(res => {
+    closeModal('modal-casa');
+    alert("¡Casa guardada correctamente!");
+    loadAdminData();
+  });
+}
+
+function editCasa(id) { openCasaModal(id); }
+function deleteCasa(id) {
+  if (confirm("¿Estás seguro de eliminar esta casa?")) {
+    callBackend('adminDeleteCasa', [state.adminPin, id]).then(() => {
+      alert("Casa eliminada.");
+      loadAdminData();
+    });
+  }
+}
+
+function openIntegranteModal(intId) {
+  document.getElementById('int-form-id').value = intId || '';
+  document.getElementById('modal-integrante-title').textContent = intId ? 'Editar Integrante' : 'Nuevo Integrante';
+
+  var select = document.getElementById('int-form-casa');
+  select.innerHTML = state.adminData.casas.map(c => `<option value="${c.ID}">${escapeHtml(c.Nombre)}</option>`).join('');
+
+  if (intId) {
+    var i = state.adminData.integrantes.find(x => x.ID === intId);
+    if (i) {
+      document.getElementById('int-form-nombre').value = i.Nombre;
+      document.getElementById('int-form-telefono').value = i.Telefono;
+      document.getElementById('int-form-casa').value = i.CasaAsignada;
+      document.getElementById('int-form-estado').value = i.Estado || 'Activo';
+    }
+  } else {
+    document.getElementById('int-form-nombre').value = '';
+    document.getElementById('int-form-telefono').value = '';
+    document.getElementById('int-form-estado').value = 'Activo';
+  }
+  openModal('modal-integrante');
+}
+
+function saveIntegranteForm(e) {
+  e.preventDefault();
+  var data = {
+    id: document.getElementById('int-form-id').value,
+    nombre: document.getElementById('int-form-nombre').value,
+    telefono: document.getElementById('int-form-telefono').value,
+    casaAsignada: document.getElementById('int-form-casa').value,
+    estado: document.getElementById('int-form-estado').value
+  };
+
+  callBackend('adminSaveIntegrante', [state.adminPin, data]).then(() => {
+    closeModal('modal-integrante');
+    alert("¡Integrante guardado!");
+    loadAdminData();
+  });
+}
+
+function editIntegrante(id) { openIntegranteModal(id); }
+function deleteIntegrante(id) {
+  if (confirm("¿Estás seguro de eliminar este integrante?")) {
+    callBackend('adminDeleteIntegrante', [state.adminPin, id]).then(() => {
+      alert("Integrante eliminado.");
+      loadAdminData();
+    });
+  }
+}
+
+function openMaterialModal(matId) {
+  document.getElementById('mat-form-id').value = matId || '';
+  document.getElementById('modal-material-title').textContent = matId ? 'Editar Material PDF' : 'Publicar Material PDF';
+
+  if (matId) {
+    var m = state.adminData.materiales.find(x => x.ID === matId);
+    if (m) {
+      document.getElementById('mat-form-titulo').value = m.Titulo;
+      document.getElementById('mat-form-descripcion').value = m.Descripcion;
+      document.getElementById('mat-form-fecha').value = m.Fecha;
+      document.getElementById('mat-form-enlace').value = m.EnlaceDrive;
+      document.getElementById('mat-form-estado').value = m.Estado || 'Activo';
+    }
+  } else {
+    var today = new Date().toISOString().split('T')[0];
+    document.getElementById('mat-form-titulo').value = '';
+    document.getElementById('mat-form-descripcion').value = '';
+    document.getElementById('mat-form-fecha').value = today;
+    document.getElementById('mat-form-enlace').value = '';
+    document.getElementById('mat-form-estado').value = 'Activo';
+  }
+  openModal('modal-material');
+}
+
+function saveMaterialForm(e) {
+  e.preventDefault();
+  var data = {
+    id: document.getElementById('mat-form-id').value,
+    titulo: document.getElementById('mat-form-titulo').value,
+    descripcion: document.getElementById('mat-form-descripcion').value,
+    fecha: document.getElementById('mat-form-fecha').value,
+    enlaceDrive: document.getElementById('mat-form-enlace').value,
+    estado: document.getElementById('mat-form-estado').value
+  };
+
+  callBackend('adminSaveMaterial', [state.adminPin, data]).then(() => {
+    closeModal('modal-material');
+    alert("¡Material publicado!");
+    loadAdminData();
+  });
+}
+
+function editMaterial(id) { openMaterialModal(id); }
+function deleteMaterial(id) {
+  if (confirm("¿Eliminar este material?")) {
+    callBackend('adminDeleteMaterial', [state.adminPin, id]).then(() => {
+      alert("Material eliminado.");
+      loadAdminData();
+    });
+  }
+}
+
+function openUsuarioModal(userPin) {
+  document.getElementById('usr-form-pin-original').value = userPin || '';
+  document.getElementById('modal-usuario-title').textContent = userPin ? 'Editar Usuario / PIN' : 'Nuevo Usuario / PIN';
+
+  var select = document.getElementById('usr-form-casa');
+  select.innerHTML = '<option value="">Ninguna (Administrador General)</option>' +
+    state.adminData.casas.map(c => `<option value="${c.ID}">${escapeHtml(c.Nombre)}</option>`).join('');
+
+  if (userPin) {
+    var u = state.adminData.usuarios.find(x => String(x.PIN) === String(userPin));
+    if (u) {
+      document.getElementById('usr-form-nombre').value = u.Nombre;
+      document.getElementById('usr-form-tipo').value = u.Tipo;
+      document.getElementById('usr-form-casa').value = u.CasaAsignada || '';
+      document.getElementById('usr-form-pin').value = u.PIN;
+      document.getElementById('usr-form-estado').value = u.Estado || 'Activo';
+    }
+  } else {
+    document.getElementById('usr-form-nombre').value = '';
+    document.getElementById('usr-form-tipo').value = 'anfitrion';
+    document.getElementById('usr-form-casa').value = state.adminData.casas[0] ? state.adminData.casas[0].ID : '';
+    document.getElementById('usr-form-pin').value = '';
+    document.getElementById('usr-form-estado').value = 'Activo';
+  }
+  toggleCasaAssignmentOption();
+  openModal('modal-usuario');
+}
+
+function toggleCasaAssignmentOption() {
+  var tipo = document.getElementById('usr-form-tipo').value;
+  var group = document.getElementById('usr-form-casa-group');
+  group.style.display = (tipo === 'admin') ? 'none' : 'block';
+}
+
+function saveUsuarioForm(e) {
+  e.preventDefault();
+  var data = {
+    pinOriginal: document.getElementById('usr-form-pin-original').value,
+    nombre: document.getElementById('usr-form-nombre').value,
+    tipo: document.getElementById('usr-form-tipo').value,
+    casaAsignada: document.getElementById('usr-form-casa').value,
+    pin: document.getElementById('usr-form-pin').value,
+    estado: document.getElementById('usr-form-estado').value
+  };
+
+  callBackend('adminSaveUsuario', [state.adminPin, data]).then(() => {
+    closeModal('modal-usuario');
+    alert("¡PIN guardado correctamente!");
+    loadAdminData();
+  });
+}
+
+function editUsuario(pin) { openUsuarioModal(pin); }
+function deleteUsuario(pin) {
+  if (confirm("¿Estás seguro de eliminar este PIN?")) {
+    callBackend('adminDeleteUsuario', [state.adminPin, pin]).then(() => {
+      alert("PIN eliminado.");
+      loadAdminData();
+    });
+  }
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
