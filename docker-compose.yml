@@ -1,0 +1,28 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: casas_db
+    restart: always
+    environment:
+      POSTGRES_DB: casas_amistad
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./schema.sql:/docker-entrypoint-initdb.d/schema.sql
+
+  adminer:
+    image: adminer:latest
+    container_name: casas_adminer
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: db
+    depends_on:
+      - db
+
+volumes:
+  postgres_data:

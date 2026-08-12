@@ -1,0 +1,6 @@
+.DS_Store
+casas_amistad.sqlite
+*.log
+/uploads/*.pdf
+!/uploads/estudio_semana_1.pdf
+!/uploads/estudio_semana_2.pdf
