@@ -12,6 +12,7 @@ function getDB(): PDO {
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                 PDO::ATTR_EMULATE_PREPARES => false,
             ]);
+            ensureMigrations($pdo);
             return $pdo;
         } catch (PDOException $e) {
             // Intentar host alternativo 'db' si falló en localhost
@@ -23,9 +24,10 @@ function getDB(): PDO {
                         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                         PDO::ATTR_EMULATE_PREPARES => false,
                     ]);
+                    ensureMigrations($pdo);
                     return $pdo;
                 } catch (PDOException $e2) {
-                    // Fallback a SQLite local si PostgreSQL no está iniciado
+                    // Fallback a SQLite local
                 }
             }
         }
@@ -41,9 +43,34 @@ function getDB(): PDO {
 
         if ($initRequired) {
             initSQLiteSchema($pdo);
+        } else {
+            ensureMigrations($pdo);
         }
     }
     return $pdo;
+}
+
+function ensureMigrations(PDO $pdo): void {
+    try {
+        // Verificar si la columna codigo_id existe en integrantes
+        $pdo->query("SELECT codigo_id FROM integrantes LIMIT 1");
+    } catch (Exception $e) {
+        // Agregar columna codigo_id si no existe
+        try {
+            $pdo->exec("ALTER TABLE integrantes ADD COLUMN codigo_id VARCHAR(20)");
+            // Asignar IDs por defecto a filas existentes
+            $stmt = $pdo->query("SELECT id FROM integrantes ORDER BY id ASC");
+            $rows = $stmt->fetchAll();
+            $code = 1001;
+            foreach ($rows as $row) {
+                $upd = $pdo->prepare("UPDATE integrantes SET codigo_id = :code WHERE id = :id");
+                $upd->execute(['code' => (string)$code, 'id' => $row['id']]);
+                $code++;
+            }
+        } catch (Exception $e2) {
+            // Ignorar errores de columna duplicada
+        }
+    }
 }
 
 function initSQLiteSchema(PDO $pdo): void {
@@ -65,6 +92,7 @@ function initSQLiteSchema(PDO $pdo): void {
 
         CREATE TABLE IF NOT EXISTS integrantes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            codigo_id TEXT UNIQUE NOT NULL,
             casa_id INTEGER REFERENCES casas(id) ON DELETE SET NULL,
             nombre_completo TEXT NOT NULL,
             telefono TEXT DEFAULT '',
@@ -98,20 +126,20 @@ function initSQLiteSchema(PDO $pdo): void {
         ('Casa de Amistad Poniente - Del Valle', 'Calle San Lorenzo #812, Col. Del Valle', 'Zona Poniente', 'Roberto Méndez', 'Daniel Vega', '5552345678', 'Miércoles', '19:00', 'https://www.google.com/maps/search/?api=1&query=Calle+San+Lorenzo+812+Del+Valle', 1),
         ('Casa de Amistad Oriente - Lindavista', 'Calle Matanzas #55, Col. Lindavista', 'Zona Oriente', 'Lucía Torres', 'Andrés Ramírez', '5558765432', 'Sábado', '18:00', 'https://www.google.com/maps/search/?api=1&query=Calle+Matanzas+55+Lindavista', 1);
 
-        INSERT INTO integrantes (casa_id, nombre_completo, telefono, email, rol)
+        INSERT INTO integrantes (codigo_id, casa_id, nombre_completo, telefono, email, rol)
         VALUES 
-        (1, 'Carlos Ruiz', '5551234567', 'carlos.ruiz@email.com', 'Anfitrión'),
-        (1, 'Mateo Fernández', '5551112233', 'mateo.f@email.com', 'Facilitador'),
-        (1, 'Mariana Sánchez', '5553334455', 'mariana.s@email.com', 'Integrante'),
-        (1, 'Fernando López', '5554445566', 'fernando.l@email.com', 'Integrante'),
-        (2, 'Elena Gómez', '5559876543', 'elena.g@email.com', 'Anfitrión'),
-        (2, 'Sofía Morales', '5552223344', 'sofia.m@email.com', 'Facilitador'),
-        (2, 'Jorge Reyes', '5556667788', 'jorge.r@email.com', 'Integrante'),
-        (3, 'Roberto Méndez', '5552345678', 'roberto.m@email.com', 'Anfitrión'),
-        (3, 'Daniel Vega', '5557778899', 'daniel.v@email.com', 'Facilitador'),
-        (3, 'Claudia Jiménez', '5558889900', 'claudia.j@email.com', 'Integrante'),
-        (4, 'Lucía Torres', '5558765432', 'lucia.t@email.com', 'Anfitrión'),
-        (4, 'Andrés Ramírez', '5559990011', 'andres.r@email.com', 'Facilitador');
+        ('1001', 1, 'Carlos Ruiz', '5551234567', 'carlos.ruiz@email.com', 'Anfitrión'),
+        ('1002', 1, 'Mateo Fernández', '5551112233', 'mateo.f@email.com', 'Facilitador'),
+        ('1003', 1, 'Mariana Sánchez', '5553334455', 'mariana.s@email.com', 'Integrante'),
+        ('1004', 1, 'Fernando López', '5554445566', 'fernando.l@email.com', 'Integrante'),
+        ('1005', 2, 'Elena Gómez', '5559876543', 'elena.g@email.com', 'Anfitrión'),
+        ('1006', 2, 'Sofía Morales', '5552223344', 'sofia.m@email.com', 'Facilitador'),
+        ('1007', 2, 'Jorge Reyes', '5556667788', 'jorge.r@email.com', 'Integrante'),
+        ('1008', 3, 'Roberto Méndez', '5552345678', 'roberto.m@email.com', 'Anfitrión'),
+        ('1009', 3, 'Daniel Vega', '5557778899', 'daniel.v@email.com', 'Facilitador'),
+        ('1010', 3, 'Claudia Jiménez', '5558889900', 'claudia.j@email.com', 'Integrante'),
+        ('1011', 4, 'Lucía Torres', '5558765432', 'lucia.t@email.com', 'Anfitrión'),
+        ('1012', 4, 'Andrés Ramírez', '5559990011', 'andres.r@email.com', 'Facilitador');
 
         INSERT INTO materiales (titulo, descripcion, semana, archivo_path)
         VALUES 
@@ -147,6 +175,10 @@ function currentUser(): ?array {
         'nombre' => $_SESSION['nombre'],
         'rol' => $_SESSION['rol']
     ];
+}
+
+function currentMemberProfile(): ?array {
+    return $_SESSION['member'] ?? null;
 }
 
 function sanitize(string $data): string {

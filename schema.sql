@@ -22,6 +22,7 @@ CREATE TABLE casas (
 
 CREATE TABLE integrantes (
     id SERIAL PRIMARY KEY,
+    codigo_id VARCHAR(20) UNIQUE NOT NULL,
     casa_id INTEGER REFERENCES casas(id) ON DELETE SET NULL,
     nombre_completo VARCHAR(150) NOT NULL,
     telefono VARCHAR(50) DEFAULT '',
@@ -57,23 +58,23 @@ VALUES
 ('Casa de Amistad Poniente - Del Valle', 'Calle San Lorenzo #812, Col. Del Valle', 'Zona Poniente', 'Roberto Méndez', 'Daniel Vega', '5552345678', 'Miércoles', '19:00', 'https://www.google.com/maps/search/?api=1&query=Calle+San+Lorenzo+812+Del+Valle', TRUE),
 ('Casa de Amistad Oriente - Lindavista', 'Calle Matanzas #55, Col. Lindavista', 'Zona Oriente', 'Lucía Torres', 'Andrés Ramírez', '5558765432', 'Sábado', '18:00', 'https://www.google.com/maps/search/?api=1&query=Calle+Matanzas+55+Lindavista', TRUE);
 
-INSERT INTO integrantes (casa_id, nombre_completo, telefono, email, rol)
+INSERT INTO integrantes (codigo_id, casa_id, nombre_completo, telefono, email, rol)
 VALUES 
-(1, 'Carlos Ruiz', '5551234567', 'carlos.ruiz@email.com', 'Anfitrión'),
-(1, 'Mateo Fernández', '5551112233', 'mateo.f@email.com', 'Facilitador'),
-(1, 'Mariana Sánchez', '5553334455', 'mariana.s@email.com', 'Integrante'),
-(1, 'Fernando López', '5554445566', 'fernando.l@email.com', 'Integrante'),
+('1001', 1, 'Carlos Ruiz', '5551234567', 'carlos.ruiz@email.com', 'Anfitrión'),
+('1002', 1, 'Mateo Fernández', '5551112233', 'mateo.f@email.com', 'Facilitador'),
+('1003', 1, 'Mariana Sánchez', '5553334455', 'mariana.s@email.com', 'Integrante'),
+('1004', 1, 'Fernando López', '5554445566', 'fernando.l@email.com', 'Integrante'),
 
-(2, 'Elena Gómez', '5559876543', 'elena.g@email.com', 'Anfitrión'),
-(2, 'Sofía Morales', '5552223344', 'sofia.m@email.com', 'Facilitador'),
-(2, 'Jorge Reyes', '5556667788', 'jorge.r@email.com', 'Integrante'),
+('1005', 2, 'Elena Gómez', '5559876543', 'elena.g@email.com', 'Anfitrión'),
+('1006', 2, 'Sofía Morales', '5552223344', 'sofia.m@email.com', 'Facilitador'),
+('1007', 2, 'Jorge Reyes', '5556667788', 'jorge.r@email.com', 'Integrante'),
 
-(3, 'Roberto Méndez', '5552345678', 'roberto.m@email.com', 'Anfitrión'),
-(3, 'Daniel Vega', '5557778899', 'daniel.v@email.com', 'Facilitador'),
-(3, 'Claudia Jiménez', '5558889900', 'claudia.j@email.com', 'Integrante'),
+('1008', 3, 'Roberto Méndez', '5552345678', 'roberto.m@email.com', 'Anfitrión'),
+('1009', 3, 'Daniel Vega', '5557778899', 'daniel.v@email.com', 'Facilitador'),
+('1010', 3, 'Claudia Jiménez', '5558889900', 'claudia.j@email.com', 'Integrante'),
 
-(4, 'Lucía Torres', '5558765432', 'lucia.t@email.com', 'Anfitrión'),
-(4, 'Andrés Ramírez', '5559990011', 'andres.r@email.com', 'Facilitador');
+('1011', 4, 'Lucía Torres', '5558765432', 'lucia.t@email.com', 'Anfitrión'),
+('1012', 4, 'Andrés Ramírez', '5559990011', 'andres.r@email.com', 'Facilitador');
 
 INSERT INTO materiales (titulo, descripcion, semana, archivo_path)
 VALUES 

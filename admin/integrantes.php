@@ -12,9 +12,22 @@ $errors = [];
 // Obtener lista de casas para dropdowns y filtros
 $casas = $pdo->query("SELECT id, nombre, ciudad_sector FROM casas ORDER BY nombre ASC")->fetchAll();
 
+// Función para sugerir el siguiente ID disponible
+function getSiguienteCodigoId(PDO $pdo): string {
+    $stmt = $pdo->query("SELECT codigo_id FROM integrantes WHERE codigo_id GLOB '[0-9]*' OR codigo_id ~ '^[0-9]+$' ORDER BY CAST(codigo_id AS INTEGER) DESC LIMIT 1");
+    $max = $stmt->fetchColumn();
+    if ($max && is_numeric($max)) {
+        return (string)(((int)$max) + 1);
+    }
+    return '1001';
+}
+
+$siguienteIdSugerido = getSiguienteCodigoId($pdo);
+
 // Procesar Guardar (Crear / Editar Integrante)
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $nombre_completo = trim($_POST['nombre_completo'] ?? '');
+    $codigo_id = trim($_POST['codigo_id'] ?? '');
     $telefono = trim($_POST['telefono'] ?? '');
     $email = trim($_POST['email'] ?? '');
     $rol = trim($_POST['rol'] ?? 'Integrante');
@@ -22,12 +35,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $post_id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
 
     if (empty($nombre_completo)) $errors[] = 'El nombre completo es obligatorio.';
+    if (empty($codigo_id)) $errors[] = 'El ID de Acceso es obligatorio.';
+
+    // Verificar unicidad de codigo_id
+    if (!empty($codigo_id)) {
+        $stmtCheck = $pdo->prepare("SELECT id FROM integrantes WHERE codigo_id = :codigo_id AND (:id IS NULL OR id != :id)");
+        $stmtCheck->execute(['codigo_id' => $codigo_id, 'id' => $post_id]);
+        if ($stmtCheck->fetch()) {
+            $errors[] = "El ID de acceso '{$codigo_id}' ya pertenece a otro usuario. Elige un ID diferente.";
+        }
+    }
 
     if (empty($errors)) {
         if ($post_id) {
             // Actualizar
             $stmt = $pdo->prepare("
                 UPDATE integrantes SET 
+                    codigo_id = :codigo_id,
                     nombre_completo = :nombre_completo,
                     telefono = :telefono,
                     email = :email,
@@ -36,6 +60,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 WHERE id = :id
             ");
             $stmt->execute([
+                'codigo_id' => $codigo_id,
                 'nombre_completo' => $nombre_completo,
                 'telefono' => $telefono,
                 'email' => $email,
@@ -47,17 +72,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             // Insertar
             $stmt = $pdo->prepare("
-                INSERT INTO integrantes (nombre_completo, telefono, email, rol, casa_id)
-                VALUES (:nombre_completo, :telefono, :email, :rol, :casa_id)
+                INSERT INTO integrantes (codigo_id, nombre_completo, telefono, email, rol, casa_id)
+                VALUES (:codigo_id, :nombre_completo, :telefono, :email, :rol, :casa_id)
             ");
             $stmt->execute([
+                'codigo_id' => $codigo_id,
                 'nombre_completo' => $nombre_completo,
                 'telefono' => $telefono,
                 'email' => $email,
                 'rol' => $rol,
                 'casa_id' => $casa_id
             ]);
-            setFlash('success', 'Integrante registrado con éxito.');
+            setFlash('success', "Integrante registrado con éxito. Su ID asignado es: {$codigo_id}");
         }
         header('Location: integrantes.php' . ($casa_id ? '?casa_id=' . $casa_id : ''));
         exit;
@@ -159,24 +185,13 @@ $flash = getFlash();
                     <input type="hidden" name="id" value="<?= $integranteActual['id'] ?>">
                 <?php endif; ?>
 
-                <div class="form-group">
-                    <label for="nombre_completo" class="form-label">Nombre Completo *</label>
-                    <input type="text" id="nombre_completo" name="nombre_completo" class="form-control" placeholder="Ej. María Elena López" value="<?= sanitize($integranteActual['nombre_completo'] ?? '') ?>" required>
-                </div>
-
                 <div class="form-grid">
                     <div class="form-group">
-                        <label for="telefono" class="form-label">Teléfono</label>
-                        <input type="text" id="telefono" name="telefono" class="form-control" placeholder="Ej. 5551112233" value="<?= sanitize($integranteActual['telefono'] ?? '') ?>">
+                        <label for="codigo_id" class="form-label">ID de Acceso Asignado *</label>
+                        <input type="text" id="codigo_id" name="codigo_id" class="form-control" placeholder="Ej. 1001" value="<?= sanitize($integranteActual['codigo_id'] ?? $siguienteIdSugerido) ?>" required>
+                        <small style="color: var(--text-muted); font-size: 0.75rem;">Este ID lo utilizará la persona para ingresar en la app.</small>
                     </div>
 
-                    <div class="form-group">
-                        <label for="email" class="form-label">Correo Electrónico</label>
-                        <input type="email" id="email" name="email" class="form-control" placeholder="maria@email.com" value="<?= sanitize($integranteActual['email'] ?? '') ?>">
-                    </div>
-                </div>
-
-                <div class="form-grid">
                     <div class="form-group">
                         <label for="rol" class="form-label">Rol en el Grupo</label>
                         <select id="rol" name="rol" class="form-control">
@@ -188,20 +203,37 @@ $flash = getFlash();
                             <?php endforeach; ?>
                         </select>
                     </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="nombre_completo" class="form-label">Nombre Completo *</label>
+                    <input type="text" id="nombre_completo" name="nombre_completo" class="form-control" placeholder="Ej. María Elena López" value="<?= sanitize($integranteActual['nombre_completo'] ?? '') ?>" required>
+                </div>
+
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="telefono" class="form-label">Teléfono de Contacto</label>
+                        <input type="text" id="telefono" name="telefono" class="form-control" placeholder="Ej. 5551112233" value="<?= sanitize($integranteActual['telefono'] ?? '') ?>">
+                    </div>
 
                     <div class="form-group">
-                        <label for="casa_id" class="form-label">Casa Asignada</label>
-                        <select id="casa_id" name="casa_id" class="form-control">
-                            <option value="">-- Sin Asignar --</option>
-                            <?php 
-                            $casaSel = $integranteActual['casa_id'] ?? $filter_casa;
-                            foreach ($casas as $c): ?>
-                                <option value="<?= $c['id'] ?>" <?= (string)$casaSel === (string)$c['id'] ? 'selected' : '' ?>>
-                                    <?= sanitize($c['nombre']) ?> (<?= sanitize($c['ciudad_sector']) ?>)
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
+                        <label for="email" class="form-label">Correo Electrónico</label>
+                        <input type="email" id="email" name="email" class="form-control" placeholder="maria@email.com" value="<?= sanitize($integranteActual['email'] ?? '') ?>">
                     </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="casa_id" class="form-label">Casa Asignada</label>
+                    <select id="casa_id" name="casa_id" class="form-control">
+                        <option value="">-- Sin Asignar --</option>
+                        <?php 
+                        $casaSel = $integranteActual['casa_id'] ?? $filter_casa;
+                        foreach ($casas as $c): ?>
+                            <option value="<?= $c['id'] ?>" <?= (string)$casaSel === (string)$c['id'] ? 'selected' : '' ?>>
+                                <?= sanitize($c['nombre']) ?> (<?= sanitize($c['ciudad_sector']) ?>)
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
                 </div>
 
                 <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
@@ -217,8 +249,8 @@ $flash = getFlash();
     <!-- Header y Filtro -->
     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem;">
         <div>
-            <h1 class="page-title" style="font-size: 1.8rem;">Registro de Integrantes</h1>
-            <p class="page-description">Consulta y asigna personas a los grupos de casa.</p>
+            <h1 class="page-title" style="font-size: 1.8rem;">Registro de Integrantes e IDs</h1>
+            <p class="page-description">Consulta los IDs de acceso para compartirlos con cada usuario.</p>
         </div>
         <div>
             <a href="integrantes.php?action=nuevo<?= $filter_casa ? '&casa_id=' . $filter_casa : '' ?>" class="btn btn-primary">+ Registrar Integrante</a>
@@ -245,22 +277,28 @@ $flash = getFlash();
         <table class="data-table">
             <thead>
                 <tr>
+                    <th>ID de Acceso</th>
                     <th>Nombre Completo</th>
                     <th>Rol</th>
                     <th>Casa Asignada</th>
                     <th>Teléfono</th>
-                    <th>Email</th>
+                    <th>Compartir ID</th>
                     <th>Acciones</th>
                 </tr>
             </thead>
             <tbody>
                 <?php if (empty($integrantes)): ?>
                     <tr>
-                        <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2rem;">No se encontraron integrantes.</td>
+                        <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 2rem;">No se encontraron integrantes.</td>
                     </tr>
                 <?php else: ?>
                     <?php foreach ($integrantes as $m): ?>
                         <tr>
+                            <td>
+                                <strong style="font-family: monospace; font-size: 1rem; background-color: var(--tag-bg); padding: 0.2rem 0.5rem; border-radius: 4px;">
+                                    <?= sanitize($m['codigo_id']) ?>
+                                </strong>
+                            </td>
                             <td><strong><?= sanitize($m['nombre_completo']) ?></strong></td>
                             <td><span class="member-role"><?= sanitize($m['rol']) ?></span></td>
                             <td>
@@ -273,7 +311,22 @@ $flash = getFlash();
                                 <?php endif; ?>
                             </td>
                             <td><?= sanitize($m['telefono']) ?></td>
-                            <td><?= sanitize($m['email']) ?></td>
+                            <td>
+                                <?php 
+                                    $num_wa = preg_replace('/[^0-9]/', '', $m['telefono']);
+                                    if (strlen($num_wa) === 10) $num_wa = '52' . $num_wa;
+                                    $mensaje_wa = rawurlencode("Hola " . $m['nombre_completo'] . ", tu ID de acceso para la app Las Casas de Mi Amistad es: " . $m['codigo_id']);
+                                ?>
+                                <?php if (!empty($num_wa)): ?>
+                                    <a href="https://wa.me/<?= $num_wa ?>?text=<?= $mensaje_wa ?>" target="_blank" class="btn btn-outline btn-sm">
+                                        Enviar por WhatsApp
+                                    </a>
+                                <?php else: ?>
+                                    <button class="btn btn-outline btn-sm" onclick="navigator.clipboard.writeText('<?= sanitize($m['codigo_id']) ?>'); alert('ID <?= sanitize($m['codigo_id']) ?> copiado al portapapeles');">
+                                        Copiar ID
+                                    </button>
+                                <?php endif; ?>
+                            </td>
                             <td>
                                 <a href="integrantes.php?action=editar&id=<?= $m['id'] ?>" class="btn btn-outline btn-sm">Editar</a>
                                 <a href="integrantes.php?action=eliminar&id=<?= $m['id'] ?><?= $filter_casa ? '&casa_id=' . $filter_casa : '' ?>" onclick="return confirmDelete('¿Estás seguro de eliminar a este integrante?')" class="btn btn-danger btn-sm">Eliminar</a>

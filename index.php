@@ -2,6 +2,8 @@
 require_once __DIR__ . '/db.php';
 
 $pdo = getDB();
+$member = currentMemberProfile();
+$flash = getFlash();
 
 // Obtener todas las casas activas con el conteo de integrantes
 $stmt = $pdo->query("
@@ -24,6 +26,24 @@ $casas = $stmt->fetchAll();
 </head>
 <body>
 
+<?php if ($member): ?>
+    <!-- Barra Superior de Estado del Usuario -->
+    <div class="user-status-bar">
+        <div class="user-status-container">
+            <div class="user-status-info">
+                <span>Hola, <strong><?= sanitize($member['nombre_completo']) ?></strong></span>
+                <span class="user-role-badge"><?= sanitize($member['rol']) ?></span>
+                <?php if (!empty($member['casa_nombre'])): ?>
+                    <span style="opacity: 0.9;">&bull; Casa: <strong><?= sanitize($member['casa_nombre']) ?></strong></span>
+                <?php endif; ?>
+            </div>
+            <div>
+                <a href="auth_id.php?action=logout" class="user-status-logout">Cambiar ID / Salir</a>
+            </div>
+        </div>
+    </div>
+<?php endif; ?>
+
 <header class="app-header">
     <div class="header-container">
         <div>
@@ -33,6 +53,11 @@ $casas = $stmt->fetchAll();
         <nav class="nav-links">
             <a href="index.php" class="nav-link active">Casas</a>
             <a href="materiales.php" class="nav-link">Materiales de Apoyo</a>
+            <?php if (!$member): ?>
+                <button onclick="openIdModal()" class="btn btn-primary btn-sm" style="font-size: 0.85rem;">
+                    Ingresar con ID
+                </button>
+            <?php endif; ?>
             <?php if (isLoggedIn()): ?>
                 <a href="admin/index.php" class="nav-link admin-btn">Panel Admin</a>
             <?php else: ?>
@@ -43,10 +68,24 @@ $casas = $stmt->fetchAll();
 </header>
 
 <main class="main-content">
+    <?php if ($flash): ?>
+        <div class="alert alert-<?= $flash['type'] ?>"><?= sanitize($flash['message']) ?></div>
+    <?php endif; ?>
+
     <section class="page-intro">
-        <h1 class="page-title">Casas de Amistad</h1>
+        <h1 class="page-title">
+            <?= $member ? "Bienvenido, " . sanitize($member['nombre_completo']) : "Casas de Amistad" ?>
+        </h1>
         <p class="page-description">
-            Encuentra un grupo semanal cerca de tu ubicación. Consulta los horarios, la dirección y contacta directamente al anfitrión o facilitador.
+            <?php if ($member): ?>
+                <?php if (!empty($member['casa_nombre'])): ?>
+                    Estás asignado a <strong><?= sanitize($member['casa_nombre']) ?></strong>. Revisa los detalles de tu reunión semanal y los integrantes de tu grupo.
+                <?php else: ?>
+                    Bienvenido a la comunidad. Tu perfil está registrado. Pide al Administrador que te asigne a una Casa de Amistad.
+                <?php endif; ?>
+            <?php else: ?>
+                Encuentra un grupo semanal cerca de tu ubicación. Ingresa tu ID de acceso proporcionado por el Administrador o explora el directorio general.
+            <?php endif; ?>
         </p>
     </section>
 
@@ -77,7 +116,10 @@ $casas = $stmt->fetchAll();
     <?php else: ?>
         <div class="houses-grid">
             <?php foreach ($casas as $casa): ?>
-                <div class="house-card house-card-item" 
+                <?php 
+                    $isMyHouse = $member && ((int)$member['casa_id'] === (int)$casa['id']);
+                ?>
+                <div class="house-card house-card-item <?= $isMyHouse ? 'my-house' : '' ?>" 
                      data-name="<?= mb_strtolower(sanitize($casa['nombre'])) ?>"
                      data-sector="<?= mb_strtolower(sanitize($casa['ciudad_sector'])) ?>"
                      data-host="<?= mb_strtolower(sanitize($casa['anfitrion_nombre'])) ?>"
@@ -85,7 +127,11 @@ $casas = $stmt->fetchAll();
                     
                     <div>
                         <div class="house-header">
-                            <?php if (!empty($casa['ciudad_sector'])): ?>
+                            <?php if ($isMyHouse): ?>
+                                <span class="house-sector" style="background-color: var(--accent-primary); color: #fff; padding: 0.2rem 0.5rem; border-radius: 4px; display: inline-block; margin-bottom: 0.4rem;">
+                                    Tu Casa Asignada
+                                </span>
+                            <?php elseif (!empty($casa['ciudad_sector'])): ?>
                                 <span class="house-sector"><?= sanitize($casa['ciudad_sector']) ?></span>
                             <?php endif; ?>
                             <h2 class="house-name"><?= sanitize($casa['nombre']) ?></h2>
@@ -136,6 +182,34 @@ $casas = $stmt->fetchAll();
         </div>
     <?php endif; ?>
 </main>
+
+<!-- Modal Emergente de Ingreso por ID de Acceso -->
+<div id="idAccessModal" class="modal-overlay <?= (!$member && !isset($_GET['noModal'])) ? 'auto-open' : '' ?>">
+    <div class="modal-card">
+        <button type="button" class="modal-close-btn" onclick="closeIdModal()">&times;</button>
+        <h2 class="modal-title">Ingreso con tu ID</h2>
+        <p class="modal-subtitle">
+            Ingresa el **ID de Acceso** de 4 dígitos proporcionado por el Administrador de tu Casa de Amistad.
+        </p>
+
+        <form action="auth_id.php" method="POST">
+            <div class="form-group">
+                <label for="modalCodigoId" class="form-label" style="text-align: center;">Número de ID de Acceso</label>
+                <input type="text" id="modalCodigoId" name="codigo_id" class="form-control" placeholder="Ej. 1001" style="text-align: center; font-size: 1.3rem; letter-spacing: 0.1em; font-weight: bold;" required autofocus>
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 0.5rem; font-size: 1rem; padding: 0.75rem;">
+                Entrar a Mi Perfil
+            </button>
+        </form>
+
+        <div style="margin-top: 1.25rem; text-align: center;">
+            <button type="button" onclick="closeIdModal()" style="background: none; border: none; font-size: 0.85rem; color: var(--text-muted); cursor: pointer; text-decoration: underline;">
+                Explorar el directorio sin ID
+            </button>
+        </div>
+    </div>
+</div>
 
 <footer class="app-footer">
     <p><?= APP_NAME ?> &mdash; Directorio de Casas y Materiales de Apoyo</p>

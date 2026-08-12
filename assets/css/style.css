@@ -27,7 +27,7 @@
   --tag-text: #333333;
   
   --shadow-subtle: 0 1px 3px rgba(0,0,0,0.05);
-  --shadow-floating: 0 10px 30px rgba(0,0,0,0.08);
+  --shadow-floating: 0 10px 30px rgba(0,0,0,0.12);
 
   --radius-sm: 4px;
   --radius-md: 8px;
@@ -51,7 +51,6 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Enlaces y botones Reset */
 a {
   color: inherit;
   text-decoration: none;
@@ -60,6 +59,51 @@ a {
 button, input, select, textarea {
   font-family: inherit;
   font-size: inherit;
+}
+
+/* User Profile Banner top bar */
+.user-status-bar {
+  background-color: var(--accent-primary);
+  color: #ffffff;
+  padding: 0.5rem 1.5rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.user-status-container {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.user-status-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.user-role-badge {
+  background-color: rgba(255, 255, 255, 0.2);
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.user-status-logout {
+  color: rgba(255, 255, 255, 0.85);
+  text-decoration: underline;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.user-status-logout:hover {
+  color: #ffffff;
 }
 
 /* Layout Principal */
@@ -137,7 +181,6 @@ button, input, select, textarea {
   padding: 0 1.5rem;
 }
 
-/* Hero & Header Sections */
 .page-intro {
   margin-bottom: 2.5rem;
   border-bottom: 1px solid var(--border-color);
@@ -159,7 +202,7 @@ button, input, select, textarea {
   max-width: 680px;
 }
 
-/* Filtros y Buscador */
+/* Toolbar Búsqueda */
 .search-toolbar {
   background-color: var(--bg-card);
   border: 1px solid var(--border-color);
@@ -220,6 +263,11 @@ button, input, select, textarea {
   flex-direction: column;
   justify-content: space-between;
   transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.house-card.my-house {
+  border: 2px solid var(--accent-primary);
+  box-shadow: 0 4px 12px rgba(44, 62, 53, 0.15);
 }
 
 .house-card:hover {
@@ -283,7 +331,6 @@ button, input, select, textarea {
   border-radius: var(--radius-sm);
 }
 
-/* Modales y Detalle de Casa */
 .card-actions {
   display: flex;
   gap: 0.75rem;
@@ -337,6 +384,72 @@ button, input, select, textarea {
 .btn-sm {
   padding: 0.35rem 0.7rem;
   font-size: 0.8rem;
+}
+
+/* Modales y Ventana Emergente ID */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease, visibility 0.2s ease;
+}
+
+.modal-overlay.active {
+  opacity: 1;
+  visibility: visible;
+}
+
+.modal-card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 2.25rem;
+  width: 90%;
+  max-width: 440px;
+  box-shadow: var(--shadow-floating);
+  transform: translateY(10px);
+  transition: transform 0.2s ease;
+}
+
+.modal-overlay.active .modal-card {
+  transform: translateY(0);
+}
+
+.modal-title {
+  font-family: var(--font-serif);
+  font-size: 1.6rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  text-align: center;
+}
+
+.modal-subtitle {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  text-align: center;
+  margin-bottom: 1.5rem;
+  line-height: 1.5;
+}
+
+.modal-close-btn {
+  position: absolute;
+  top: 1rem;
+  right: 1.25rem;
+  background: none;
+  border: none;
+  font-size: 1.25rem;
+  color: var(--text-muted);
+  cursor: pointer;
 }
 
 /* Tablas Administrativas */
@@ -449,7 +562,6 @@ button, input, select, textarea {
   color: #8c1d1d;
 }
 
-/* Badges y Listas de Integrantes */
 .members-list {
   list-style: none;
   padding: 0;
@@ -477,7 +589,6 @@ button, input, select, textarea {
   font-weight: 500;
 }
 
-/* Materiales de Apoyo */
 .materials-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
@@ -516,7 +627,6 @@ button, input, select, textarea {
   margin-bottom: 1.25rem;
 }
 
-/* Footer */
 .app-footer {
   border-top: 1px solid var(--border-color);
   background-color: var(--bg-card);
@@ -525,9 +635,4 @@ button, input, select, textarea {
   text-align: center;
   color: var(--text-muted);
   font-size: 0.85rem;
-}
-
-.footer-link {
-  color: var(--text-main);
-  font-weight: 500;
 }
