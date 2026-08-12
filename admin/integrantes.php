@@ -14,12 +14,22 @@ $casas = $pdo->query("SELECT id, nombre, ciudad_sector FROM casas ORDER BY nombr
 
 // Función para sugerir el siguiente ID disponible
 function getSiguienteCodigoId(PDO $pdo): string {
-    $stmt = $pdo->query("SELECT codigo_id FROM integrantes WHERE codigo_id GLOB '[0-9]*' OR codigo_id ~ '^[0-9]+$' ORDER BY CAST(codigo_id AS INTEGER) DESC LIMIT 1");
-    $max = $stmt->fetchColumn();
-    if ($max && is_numeric($max)) {
-        return (string)(((int)$max) + 1);
+    try {
+        $stmt = $pdo->query("SELECT codigo_id FROM integrantes");
+        $codes = $stmt->fetchAll(PDO::FETCH_COLUMN);
+        $max = 1000;
+        foreach ($codes as $code) {
+            if (is_numeric($code)) {
+                $val = (int)$code;
+                if ($val > $max) {
+                    $max = $val;
+                }
+            }
+        }
+        return (string)($max + 1);
+    } catch (Exception $e) {
+        return '1001';
     }
-    return '1001';
 }
 
 $siguienteIdSugerido = getSiguienteCodigoId($pdo);
